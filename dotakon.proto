@@ -9,11 +9,11 @@ enum SignatureScheme {
   UNKNOWN = 0;
 
   // Schnorr signatures over the Pallas curve using the SHA-3-256 hash.
-  SCHNORR_PALLAS_SHA3_256 = 10;
+  SCHNORR_PALLAS_SHA3_256 = 100;
 
   // Schnorr signatures over the Pallas curve using the 128-bit Poseidon hash. This scheme allows
   // for fast signing and verification in zk-SNARK circuits based on Halo2.
-  SCHNORR_PALLAS_POSEIDON_128 = 20;
+  SCHNORR_PALLAS_POSEIDON_128 = 200;
 }
 
 // 256-bit unsigned integer type used to transmit wallet addresses, SHA hashes and similar data.
@@ -32,21 +32,13 @@ message Bytes32 {
 // This protobuf doesn't contain the signed bytes themselves, those have to be transmitted
 // separately.
 //
-// NOTE: whenever we sign a message we don't sign the message itself, but its SHA-3-256 hash.
-// Verifying a signature provided as a `Signature` protobuf requires recalculating the SHA-3-256
-// hash of the original message and verifying it with the public key (and of course also checking
-// that the SHA-3-256 hash of the public key equals `signer`).
-//
 // WARNING: signed messages should always contain nonces and/or timestamps, otherwise they're
 // vulnerable to replay attacks.
 message Signature {
   // REQUIRED.
   optional Bytes32 signer = 1;
 
-  // REQUIRED. The algorithm used to derive the signing keypair.
-  //
-  // NOTE: it's implicit that the SHA-3 hash of the original message, not the message itself, is
-  // signed with the private key.
+  // REQUIRED.
   optional SignatureScheme scheme = 2;
 
   // REQUIRED. The public key of the signer, whose SHA-3 hash must equal `signer` for the signature
@@ -121,8 +113,8 @@ message GetIdentityRequest {}
 
 // Describes the topology of the network.
 message NetworkTopology {
-  // Describes a "cluster", sometimes also known as a "clique", a set of nodes where all nodes are
-  // connected to all other nodes.
+  // Describes a "cluster", sometimes also known as a "clique", a set of nodes that are all
+  // connected to each other.
   message Cluster {
     repeated NodeIdentity node = 1;
   }
