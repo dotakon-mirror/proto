@@ -1,0 +1,243 @@
+syntax = "proto2";
+
+import "google/protobuf/timestamp.proto";
+
+package dotakon;
+
+// The keypair generation algorithm.
+enum SignatureScheme {
+  UNKNOWN = 0;
+
+  // Schnorr signatures over the Pallas curve using the SHA-3-256 hash.
+  SCHNORR_PALLAS_SHA3_256 = 10;
+
+  // Schnorr signatures over the Pallas curve using the 128-bit Poseidon hash. This scheme allows
+  // for fast signing and verification in zk-SNARK circuits based on Halo2.
+  SCHNORR_PALLAS_POSEIDON_128 = 20;
+}
+
+// 256-bit unsigned integer type used to transmit wallet addresses, SHA hashes and similar data.
+//
+// The words are in little endian order, so `w1` is the least significant word and `w4` is the most
+// significant one.
+message Bytes32 {
+  required fixed64 w1 = 1;
+  required fixed64 w2 = 2;
+  required fixed64 w3 = 3;
+  required fixed64 w4 = 4;
+}
+
+// Signature type for various purposes.
+//
+// This protobuf doesn't contain the signed bytes themselves, those have to be transmitted
+// separately.
+//
+// NOTE: whenever we sign a message we don't sign the message itself, but its SHA-3-256 hash.
+// Verifying a signature provided as a `Signature` protobuf requires recalculating the SHA-3-256
+// hash of the original message and verifying it with the public key (and of course also checking
+// that the SHA-3-256 hash of the public key equals `signer`).
+//
+// WARNING: signed messages should always contain nonces and/or timestamps, otherwise they're
+// vulnerable to replay attacks.
+message Signature {
+  // REQUIRED.
+  optional Bytes32 signer = 1;
+
+  // REQUIRED. The algorithm used to derive the signing keypair.
+  //
+  // NOTE: it's implicit that the SHA-3 hash of the original message, not the message itself, is
+  // signed with the private key.
+  optional SignatureScheme scheme = 2;
+
+  // REQUIRED. The public key of the signer, whose SHA-3 hash must equal `signer` for the signature
+  // to be valid.
+  optional bytes public_key = 3;
+
+  // REQUIRED. The signature bytes.
+  optional bytes signature = 4;
+}
+
+message ProtocolVersion {
+  optional uint32 major = 1;
+  optional uint32 minor = 2;
+  optional uint32 build = 3;
+}
+
+// Contains the geographical location of a node.
+message GeographicalLocation {
+  optional double latitude = 1;
+  optional double longitude = 2;
+}
+
+// Describes a node of the network.
+message NodeIdentity {
+  message Payload {
+    // Protocol version implemented by the node, as indicated by the tags of the Git repository
+    // containing this file.
+    optional ProtocolVersion protocol_version = 1;
+
+    // Wallet address of the node. This is the address used to stake DOT and earn rewards for
+    // participating in the network.
+    optional Bytes32 wallet_address = 2;
+
+    // Self-declared geographical location of the node.
+    //
+    // NOTE: it's in the node's best interest to declare an accurate location, otherwise it won't be
+    // able to achieve a competitive serving SLO.
+    optional GeographicalLocation location = 3;
+
+    // The IP address other nodes can use to connect to this node. It can be an IPv4 address, an
+    // IPv6 address, or a DNS name, but it must be in a canonical form that can be used to uniquely
+    // identify the node. The protocol treats addresses opaquely so they are entirely self-declared,
+    // but the address format must remaing consistent throughout participation. For example, a
+    // dual-stack node cannot provide an IPv4 address and then switch to IPv6, or provide an IPv6
+    // address in one format and then switch to a different format, etc. In order to change address,
+    // a node must leave and re-join the network.
+    optional string network_address = 4;
+
+    // The TCP port where the node exposes this gRPC protocol.
+    optional uint32 grpc_port = 5;
+
+    // The TCP port where the node exposes this protocol as gRPC-web.
+    optional uint32 http_port = 6;
+
+    // The time of serialization of this message, used to avoid signature replay attacks.
+    optional google.protobuf.Timestamp timestamp = 7;
+  }
+
+  // NOTE: in the Dotakon protocol all connections are authenticated, so the wallet_address provided
+  // in the identity MUST equal the authenticated address.
+  optional Payload payload = 1;
+
+  // Required as proof to propose slashing if a node tries to attack the network by e.g. repeatedly
+  // changing geographical location causing many topology refactorings. Note that at present
+  // changing geographical location is not allowed at all. If a node wants to physically move, it
+  // needs to leave and re-join the network.
+  optional Signature signature = 2;
+}
+
+// Requests the identity of a node.
+message GetIdentityRequest {}
+
+// Describes the topology of the network.
+message NetworkTopology {
+  // Describes a "cluster", sometimes also known as a "clique", a set of nodes where all nodes are
+  // connected to all other nodes.
+  message Cluster {
+    repeated NodeIdentity node = 1;
+  }
+
+  // The topology is a fully connected graph of clusters, so listing all the clusters is sufficient
+  // to determine the whole topology.
+  repeated Cluster cluster = 1;
+}
+
+// Requests the current network topology.
+message GetTopologyRequest {}
+
+// Requests the DOT balance of an account at the specified block number. The specified account can
+// be a smartcontract or an EOA alike.
+message GetAccountBalanceRequest {
+  // An optional block number (defaults to the latest block if unspecified).
+  optional uint64 block_number = 1;
+
+  // REQUIRED: the address to query.
+  optional Bytes32 account_address = 2;
+}
+
+// Returns the DOT balance of an account at the specified block number.
+message GetAccountBalanceResponse {
+  // The block number.
+  optional uint64 block_number = 1;
+
+  // The DOT balance in dan (1 DOT = 1e18 dan).
+  optional Bytes32 balance = 2;
+}
+
+// A (signed) proposal for a new network topology provided while negotating the entrance of a new
+// node in the network. See `NodeService.RefactorNetwork` for details about the negotiation process.
+message TopologyProposal {
+  // NOTE: the timestamp avoids replay attacks.
+  message Payload {
+    optional NetworkTopology proposal = 1;
+    optional google.protobuf.Timestamp timestamp = 2;
+  }
+  optional Payload payload = 1;
+  optional Signature signature = 2;
+};
+
+// Sent during network negotiation to express agreement by both parties on the new topology of the
+// network. See `NodeService.RefactorNetwork` for details about the negotiation process.
+message TopologyAgreement {
+  optional TopologyProposal.Payload proposal = 1;
+  optional Signature peer_signature = 2;
+  optional Signature own_signature = 3;
+}
+
+// Request to refactor the network topology (made by a new node when it wants to join the network).
+message NetworkRefactoringRequest {
+  oneof topology_refactoring {
+    NodeIdentity joiner_identity = 1;
+    TopologyProposal proposal = 2;
+    TopologyAgreement agreement = 3;
+  }
+}
+
+// Network topology negotiation responses.
+message NetworkRefactoringResponse {
+  oneof topology_refactoring {
+    TopologyProposal proposal = 1;
+    TopologyAgreement agreement = 2;
+  }
+}
+
+service NodeServiceV1 {
+  // Returns the identity of the node.
+  rpc GetIdentity(GetIdentityRequest) returns (NodeIdentity);
+
+  // Returns the current topology of the network.
+  rpc GetTopology(GetTopologyRequest) returns (NetworkTopology);
+
+  // Returns the DOT balance of an account at a given block number (or at the latest block).
+  rpc GetAccountBalance(GetAccountBalanceRequest) returns (GetAccountBalanceResponse);
+
+  // This RPC is a bi-directional stream started by a new node to negotiate a network topology
+  // refactoring so that it can be included in the network. We refer to the new node (the client of
+  // this RPC) as the "joiner" and the responding node (the server of this RPC) as the "responder".
+  //
+  // The joiner and the responder must exchange topology proposals with strictly monotonically
+  // increasing convergence, until either both are OK with the last proposed topology or an error is
+  // detected (in the latter case the responder will close the stream).
+  //
+  // Convergence of the topology is measured as the variance of the squared distance of each node
+  // from its assigned k-means centroid. In order for the topology to be valid, parameter k of the
+  // k-means algorithm MUST be `ceil(sqrt(N))`, with N = number of nodes in the network including
+  // the new one.
+  //
+  // After successfully negotiating a topology refactoring, the joiner must close this stream and
+  // broadcast a `JoinRequest` ensuring that it's received by ALL nodes (`JoinResponse` contains
+  // acknowledgement signatures). Failure to update some nodes may result in a slashing proposal by
+  // those nodes.
+  //
+  // The full sequence of events for a `RefactorNetwork` RPC follows:
+  //
+  //  * the joiner starts the stream;
+  //  * the joiner sends its `NodeIdentity` (see `NetworkRefactoringRequest.joiner_identity`);
+  //  * the responder performs sanity checks, e.g.:
+  //    * the joiner must not have already joined,
+  //    * the wallet address of the joiner must have the minimum amount of DOT to stake,
+  //    * etc.
+  //  * the joiner calculates a valid topology and sends a signed `TopologyProposal`;
+  //  * the responder either:
+  //    * sends back a strictly better topology (lower variance of squared distances from
+  //      centroids), or
+  //    * agrees with the proposed topology;
+  //  * after receiving signed agreement by the responder, the joiner:
+  //    * closes the stream,
+  //    * connects to the nodes of its cluster as agreed;
+  //    * submits a "join network" transaction.
+  //
+  rpc RefactorNetwork(stream NetworkRefactoringRequest) returns (stream NetworkRefactoringResponse);
+
+  // TODO
+}
