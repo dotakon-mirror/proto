@@ -9,6 +9,10 @@ enum SignatureScheme {
   UNKNOWN = 0;
 
   // Schnorr signatures over the Pallas curve using the SHA-3-256 hash.
+  //
+  // NOTE: Pallas scalars are defined over a prime field whose order is a large prime with roughly
+  // 252 bits, so the SHA-3 challenge hash of the signature must be wrapped modulo that prime (a
+  // little entropy will be lost).
   SCHNORR_PALLAS_SHA3_256 = 100;
 
   // Schnorr signatures over the Pallas curve using the 128-bit Poseidon hash. This scheme allows
@@ -16,7 +20,7 @@ enum SignatureScheme {
   SCHNORR_PALLAS_POSEIDON_128 = 200;
 }
 
-// 256-bit unsigned integer type used to transmit wallet addresses, SHA hashes and similar data.
+// 256-bit unsigned integer type used to transmit wallet addresses, SHA hashes, and similar data.
 //
 // The words are in little endian order, so `w1` is the least significant word and `w4` is the most
 // significant one.
