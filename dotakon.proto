@@ -1,8 +1,60 @@
 syntax = "proto2";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
 package dotakon;
+
+// # General Notes
+//
+// ## Signatures
+//
+// Some messages are cryptographically signed by the emitting node. These messages are generally
+// structured as follows:
+//
+//   message SignedMessage {
+//     message Payload {
+//       // ...
+//     }
+//     optional .google.protobuf.Any payload = 1;
+//     optional Signature signature = 2;
+//   }
+//
+// See `NodeIdentity` for an example.
+//
+// For this kind of messages, the `type_url` of the `Any` must be set to
+// `type.dotakon.org/fully.qualified.path.of.ThePayload` and the value must be the wire encoding of
+// a `Payload` message. For example, the type_url of a `NodeIdentity` payload would be
+// `type.dotakon.org/dotakon.NodeIdentity.Payload`.
+//
+// The attached signature refers to the bytes of the wire encoding of the `payload` message, which
+// wraps the actual message. Using an `Any` achieves two important goals:
+//
+//   * it provides a type_url that acts as a domain separator, preventing misinterpretation attacks;
+//   * and it clarifies that the signature refers to the bytes of the payload as encoded inside the
+//     `Any` (the `Any` stores the encoded message as a raw byte array).
+//
+// The latter is important because protobuf encoding is not canonical: field ordering is not
+// deterministic, it might have duplicated fields/tags, etc. But any actor that wishes to verify the
+// signature needs to know exactly the byte array to verify.
+//
+// Note that the need for a wrapping `Any` reintroduces the encoding problem: `Any` has two fields
+// (the type_url and the byte array) and it's unspecified which one is encoded first or whether a
+// field is repeated more than once (the decoding is still unambiguous thanks to protobuf's Last One
+// Wins rule). To address that we require that the whole `Any` is encoded canonically as follows:
+//
+//   * both fields must be present (as if they were required),
+//   * field `type_url` (tagged 1) must be the first,
+//   * field `value` (tagged 2) must be the second,
+//   * there must not be repeated fields.
+//
+// Implementors don't need to modify their gRPC & protobuf frameworks to enforce this, they just
+// need to know that, when signing or verifying, the signed/verified message must be encoded this
+// way. Implementing canonical encoding for a known, two-field protobuf is quite easy and much
+// better than implementing it generically for any protobuf.
+//
+// Note that since canonical encoding is only implemented for the wrapping `Any`, the wrapped
+// message cannot be re-encoded without changing the signature.
 
 // The keypair generation algorithm.
 enum SignatureScheme {
@@ -101,9 +153,11 @@ message NodeIdentity {
     optional google.protobuf.Timestamp timestamp = 7;
   }
 
+  // The encoded payload. The type URL must be `type.dotakon.org/dotakon.NodeIdentity.Payload`.
+  //
   // NOTE: in the Dotakon protocol all connections are authenticated, so the wallet_address provided
   // in the identity MUST equal the authenticated address.
-  optional Payload payload = 1;
+  optional google.protobuf.Any payload = 1;
 
   // Required as proof to propose slashing if a node tries to attack the network by e.g. repeatedly
   // changing geographical location causing many topology refactorings. Note that at present
@@ -158,14 +212,21 @@ message TopologyProposal {
     optional NetworkTopology proposal = 1;
     optional google.protobuf.Timestamp timestamp = 2;
   }
-  optional Payload payload = 1;
+
+  // The type_url must be `type.dotakon.org/dotakon.TopologyProposal.Payload`.
+  optional google.protobuf.Any payload = 1;
+
   optional Signature signature = 2;
 };
 
 // Sent during network negotiation to express agreement by both parties on the new topology of the
 // network. See `NodeService.RefactorNetwork` for details about the negotiation process.
 message TopologyAgreement {
-  optional TopologyProposal.Payload proposal = 1;
+  // The wrapped message must be a `TopologyProposal.Payload` type_url must be
+  // `type.dotakon.org/dotakon.TopologyProposal.Payload`.
+  optional google.protobuf.Any proposal = 1;
+
+  // Both signatures refer to the canonical byte encoding of `proposal`.
   optional Signature peer_signature = 2;
   optional Signature own_signature = 3;
 }
