@@ -113,8 +113,13 @@ message ProtocolVersion {
 
 // Contains the geographical location of a node.
 message GeographicalLocation {
-  optional double latitude = 1;
-  optional double longitude = 2;
+  // The latitude expressed in minutes, ranging from -5400 (equal to -90 degrees) to 5400 (equal to
+  // +90 degrees).
+  optional int32 latitude = 1;
+
+  // The longitude expressed in minutes, ranging from 0 (equal to 0 degrees) to 10800 (equal to 180
+  // degrees).
+  optional uint32 longitude = 2;
 }
 
 // Describes a node of the network.
