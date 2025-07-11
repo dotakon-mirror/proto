@@ -117,6 +117,36 @@ message BlockDescriptor {
   optional Bytes32 balances_root_hash = 3;
 }
 
+// A Merkle proof for a piece of storage.
+//
+// TODO: explain how to verify it and how to extract the requested value.
+message MerkleProof {
+  // REQUIRED. The descriptor of the block whose storage is being queried.
+  optional BlockDescriptor block_descriptor = 1;
+
+  // A node of the lookup path.
+  message Node {
+    // The (possibly empty) set of labels and hashes of the children of this node, indexed by the
+    // labels.
+    map<string, Bytes32> children = 1;
+
+    // The hash of this node, which must be among the children of the next node.
+    optional Bytes32 hash = 2;
+  }
+
+  // The full key of the queried storage location.
+  optional string key = 2;
+
+  // The queried value. The exact type depends on the context where this proof is used. For example,
+  // when querying account balances via the `GetAccountBalance` RPC the value is a DOT balance
+  // encoded as a `Bytes32` message.
+  optional google.protobuf.Any value = 3;
+
+  // The lookup path up to the root of the Merkle-Patricia Trie. The first node is the looked up
+  // leaf, while the last one is the root.
+  repeated Node node = 4;
+}
+
 // Contains the geographical location of a node.
 message GeographicalLocation {
   // The latitude expressed in minutes, ranging from -5400 (equal to -90 degrees) to 5400 (equal to
@@ -224,31 +254,10 @@ message GetAccountBalanceRequest {
 
 // Returns the Merkle-proven DOT balance of an account at the specified block.
 message GetAccountBalanceResponse {
-  // The Merkle proof of the requested balance.
+  // The encoded payload. The type URL must be `type.dotakon.org/dotakon.MerkleProof`.
   //
-  // TODO: explain how to verify it and how to extract the requested balance.
-  message Payload {
-    // REQUIRED. The descriptor of the block at which the specified account had that balance.
-    optional BlockDescriptor block_descriptor = 1;
-
-    // A node of the lookup path.
-    message Node {
-      // The (possibly empty) set of labels and hashes of the children of this node, indexed by the
-      // labels. The alphabet of the labels is the set of lowercase hexadecimal character (pattern
-      // [0-9a-f]*).
-      map<string, Bytes32> children = 1;
-
-      // The hash of this node, which must be among the children of the next node.
-      optional Bytes32 hash = 2;
-    }
-
-    // The lookup path up to the root of the account balance tree. The first node is the looked up
-    // leaf, while the last one is the root.
-    repeated Node node = 2;
-  }
-
-  // The encoded payload. The type URL must be
-  // `type.dotakon.org/dotakon.GetAccountBalanceResponse.Payload`.
+  // The value inside the proof must be a `Bytes32` message providing the DOT balance in dan. The
+  // key must be the account address.
   optional google.protobuf.Any payload = 1;
 
   // REQUIRED. The message must be signed so that the server can be slashed if it returns wrong
