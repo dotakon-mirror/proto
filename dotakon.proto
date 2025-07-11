@@ -188,7 +188,12 @@ message GetBlockRequest {
 
 // Returns information about a block.
 message GetBlockResponse {
-  optional BlockDescriptor descriptor = 1;
+  // The encoded payload. The type URL must be `type.dotakon.org/dotakon.BlockDescriptor`.
+  optional google.protobuf.Any payload = 1;
+
+  // REQUIRED. The message must be signed so that the server can be slashed if it returns wrong
+  // data.
+  optional Signature signature = 2;
 }
 
 // Describes the topology of the network.
