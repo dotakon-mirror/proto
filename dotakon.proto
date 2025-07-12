@@ -113,8 +113,9 @@ message ProtocolVersion {
 
 message BlockDescriptor {
   optional Bytes32 block_hash = 1;
-  optional Bytes32 previous_block_hash = 2;
-  optional Bytes32 balances_root_hash = 3;
+  optional fixed64 block_number = 2;
+  optional Bytes32 previous_block_hash = 3;
+  optional Bytes32 account_balances_root_hash = 4;
 }
 
 // A Merkle proof for a piece of storage.
