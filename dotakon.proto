@@ -72,7 +72,7 @@ enum SignatureScheme {
   SCHNORR_PALLAS_POSEIDON_128 = 200;
 }
 
-// 256-bit unsigned integer type used to transmit wallet addresses, SHA hashes, and similar data.
+// 256-bit unsigned integer type used to transmit account addresses, SHA hashes, and similar data.
 //
 // The words are in little endian order, so `w1` is the least significant word and `w4` is the most
 // significant one.
@@ -115,7 +115,9 @@ message BlockDescriptor {
   optional Bytes32 block_hash = 1;
   optional fixed64 block_number = 2;
   optional Bytes32 previous_block_hash = 3;
-  optional Bytes32 account_balances_root_hash = 4;
+  optional Bytes32 network_topology_root_hash = 4;
+  optional Bytes32 account_balances_root_hash = 5;
+  optional Bytes32 program_storage_root_hash = 6;
 }
 
 // A Merkle proof for a piece of storage.
@@ -168,7 +170,7 @@ message NodeIdentity {
 
     // Wallet address of the node. This is the address used to stake DOT and earn rewards for
     // participating in the network.
-    optional Bytes32 wallet_address = 2;
+    optional Bytes32 account_address = 2;
 
     // Self-declared geographical location of the node.
     //
@@ -197,8 +199,8 @@ message NodeIdentity {
 
   // The encoded payload. The type URL must be `type.dotakon.org/dotakon.NodeIdentity.Payload`.
   //
-  // NOTE: in the Dotakon protocol all connections are authenticated, so the wallet_address provided
-  // in the identity MUST equal the authenticated address.
+  // NOTE: in the Dotakon protocol all connections are authenticated, so the account_address
+  // provided in the identity MUST equal the authenticated address.
   optional google.protobuf.Any payload = 1;
 
   // Required as proof to propose slashing if a node tries to attack the network by e.g. repeatedly
@@ -347,7 +349,7 @@ service NodeServiceV1 {
   //  * the joiner sends its `NodeIdentity` (see `NetworkRefactoringRequest.joiner_identity`);
   //  * the responder performs sanity checks, e.g.:
   //    * the joiner must not have already joined,
-  //    * the wallet address of the joiner must have the minimum amount of DOT to stake,
+  //    * the account address of the joiner must have the minimum amount of DOT to stake,
   //    * etc.
   //  * the joiner calculates a valid topology and sends a signed `TopologyProposal`;
   //  * the responder either:
