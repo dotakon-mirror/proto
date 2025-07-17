@@ -115,7 +115,7 @@ message Signature {
 
 message VerifiableRandomness {
   // REQUIRED. The account address of the prover.
-  optional bytes prover = 1;
+  optional Bytes32 prover = 1;
 
   // REQUIRED.
   optional VerifiableRandomnessScheme scheme = 2;
