@@ -125,7 +125,7 @@ message VerifiableRandomness {
   optional bytes public_key = 3;
 
   // REQUIRED. The message used to seed the VRF.
-  optional string message = 4;
+  optional bytes message = 4;
 
   // REQUIRED. The encoded output (this contains both the output randomness and the zero-knowledge
   // proof).
