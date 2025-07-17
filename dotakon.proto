@@ -56,20 +56,28 @@ package dotakon;
 // Note that since canonical encoding is only implemented for the wrapping `Any`, the wrapped
 // message cannot be re-encoded without changing the signature.
 
-// The keypair generation algorithm.
+// The keypair generation algorithm and signature scheme.
 enum SignatureScheme {
-  UNKNOWN = 0;
+  SIG_UNKNOWN = 0;
 
   // Schnorr signatures over the Pallas curve using the SHA-3-256 hash.
   //
   // NOTE: Pallas scalars are defined over a prime field whose order is a large prime with roughly
   // 252 bits, so the SHA-3 challenge hash of the signature must be wrapped modulo that prime (a
   // little entropy will be lost).
-  SCHNORR_PALLAS_SHA3_256 = 100;
+  SIG_SCHNORR_PALLAS_SHA3_256 = 100;
 
   // Schnorr signatures over the Pallas curve using the 128-bit Poseidon hash. This scheme allows
   // for fast signing and verification in zk-SNARK circuits based on Halo2.
-  SCHNORR_PALLAS_POSEIDON_128 = 200;
+  SIG_SCHNORR_PALLAS_POSEIDON_128 = 200;
+}
+
+// The VRF scheme.
+enum VerifiableRandomnessScheme {
+  VRF_UNKNOWN = 0;
+
+  // VRF based on Decisional Diffie-Hellman over the Ristretto curve using the SHA-3 hash.
+  VRF_DDH_RISTRETTO_SHA3 = 1;
 }
 
 // 256-bit unsigned integer type used to transmit account addresses, SHA hashes, and similar data.
@@ -91,7 +99,7 @@ message Bytes32 {
 // WARNING: signed messages should always contain nonces and/or timestamps, otherwise they're
 // vulnerable to replay attacks.
 message Signature {
-  // REQUIRED.
+  // REQUIRED. The account address of the signer.
   optional Bytes32 signer = 1;
 
   // REQUIRED.
@@ -103,6 +111,25 @@ message Signature {
 
   // REQUIRED. The signature bytes.
   optional bytes signature = 4;
+}
+
+message VerifiableRandomness {
+  // REQUIRED. The account address of the prover.
+  optional bytes prover = 1;
+
+  // REQUIRED.
+  optional VerifiableRandomnessScheme scheme = 2;
+
+  // REQUIRED. The public key of the prover, whose SHA-3 hash must equal `prover` for the output to
+  // be valid.
+  optional bytes public_key = 3;
+
+  // REQUIRED. The message used to seed the VRF.
+  optional string message = 4;
+
+  // REQUIRED. The encoded output (this contains both the output randomness and the zero-knowledge
+  // proof).
+  optional bytes randomness = 5;
 }
 
 message ProtocolVersion {
@@ -268,6 +295,64 @@ message GetAccountBalanceResponse {
   optional Signature signature = 2;
 }
 
+message BroadcastBlockRequest {
+  // Proof that the sender was actually a leader for the slot.
+  message LeaderElectionProof {
+    // REQUIRED. The slot number.
+    optional uint64 slot_number = 1;
+
+    // REQUIRED. The previous block hash, which we use a per-slot randomness when seeding the VRF.
+    optional Bytes32 previous_block_hash = 2;
+
+    // REQUIRED. The seed message MUST be in the format
+    // `{domain="dotakon/ssle-v1",slot_number=N,slot_randomness=SLOT_RANDOMNESS}`, where `N` is the
+    // base-10 slot number and `SLOT_RANDOMNESS` is the hash of the previous block encoded in
+    // lower-case hex starting with `0x`.
+    optional VerifiableRandomness randomness = 3;
+  }
+
+  // REQUIRED.
+  optional LeaderElectionProof leader_election_proof = 1;
+
+  // REQUIRED. The descriptor of the new block.
+  optional BlockDescriptor block_descriptor = 2;
+
+  // Contains the block data elements that changed compared to the previous block. A receiver of
+  // this message should update all the provided elements, recalculate all affected Merkle hashes,
+  // and check that all root hashes match the corresponding ones provided in the `BlockDescriptor`.
+  message BlockDiff {
+    // TODO: add network state (or changes thereof).
+
+    // To save space, Merkle hashes are not included here. The receiver must recalculate them.
+    message TrieNode {
+      map<string, AccountBalanceTrieNode> children = 1;
+    }
+
+    message AccountBalanceTrieNode {
+      oneof node {
+        bytes value = 1;
+        TrieNode children = 2;
+      }
+    }
+
+    optional AccountBalanceTrieNode account_balance_changes = 2;
+
+    message ProgramStorageTrieNode {
+      oneof node {
+        uint64 value = 1;
+        TrieNode children = 2;
+      }
+    }
+
+    optional ProgramStorageTrieNode program_storage_changes = 3;
+  }
+
+  // REQUIRED.
+  optional BlockDiff block_diff = 3;
+}
+
+message BroadcastBlockResponse {}
+
 // A (signed) proposal for a new network topology provided while negotating the entrance of a new
 // node in the network. See `NodeService.RefactorNetwork` for details about the negotiation process.
 message TopologyProposal {
@@ -324,6 +409,9 @@ service NodeServiceV1 {
 
   // Returns the DOT balance of an account at a given block number (or at the latest block).
   rpc GetAccountBalance(GetAccountBalanceRequest) returns (GetAccountBalanceResponse);
+
+  // Used by the leader(s) of a slot to publish a new block.
+  rpc BroadcastNewBlock(BroadcastBlockRequest) returns (BroadcastBlockResponse);
 
   // This RPC is a bi-directional stream started by a new node to negotiate a network topology
   // refactoring so that it can be included in the network. We refer to the new node (the client of
