@@ -86,8 +86,13 @@ enum VerifiableRandomnessScheme {
 
 // 256-bit unsigned integer type used to transmit account addresses, SHA hashes, and similar data.
 //
-// The words are in little endian order, so `w1` is the least significant word and `w4` is the most
-// significant one.
+// For data types with endianness (e.g. account balances) the words are in little endian order, so
+// `w1` is the least significant word and `w4` is the most significant one.
+//
+// For data types without endianness (e.g. hashes and account addresses) the words are stored in
+// order, so `w1` contains the first 8 bytes and `w4` the last 8. The 8 bytes of each word are
+// stored in little endian order, so the least significant byte of `w1` is the first byte of the
+// sequence and the most significant byte of `w4` is the last of the sequence.
 message Bytes32 {
   required fixed64 w1 = 1;
   required fixed64 w2 = 2;
@@ -299,6 +304,45 @@ message GetAccountBalanceResponse {
   optional Signature signature = 2;
 }
 
+// A signed transaction. Note that the sender is the signer of the transaction, i.e.
+// `signature.signer`.
+message Transaction {
+  // Payload content for DOT transfer transactions.
+  message TransferCoins {
+    optional Bytes32 recipient = 1;
+    optional Bytes32 amount = 2;
+  }
+
+  // Payload content for smartcontract deployment transactions.
+  message CreateProgram {
+    optional bytes bytecode = 1;
+  }
+
+  message Payload {
+    optional uint64 nonce = 1;
+
+    oneof transaction {
+      TransferCoins transfer_coins = 2;
+      CreateProgram create_program = 3;
+    }
+  }
+
+  // The type URL must be `type.dotakon.org/dotakon.Transaction.Payload`.
+  optional google.protobuf.Any payload = 1;
+
+  optional Signature signature = 2;
+}
+
+message BroadcastTransactionRequest {
+  // REQUIRED. The transaction to broadcast.
+  optional Transaction transaction = 1;
+
+  // The TTL for the message.
+  optional uint32 ttl = 2 [default = 0];
+}
+
+message BroadcastTransactionResponse {}
+
 message BroadcastBlockRequest {
   // Proof that the sender was actually a leader for the slot.
   message LeaderElectionProof {
@@ -318,7 +362,8 @@ message BroadcastBlockRequest {
   // REQUIRED.
   optional LeaderElectionProof leader_election_proof = 1;
 
-  // REQUIRED. The descriptor of the new block.
+  // The descriptor of the new block. If both this field and `block_diff` are missing it means the
+  // node didn't produce any block during the slot.
   optional BlockDescriptor block_descriptor = 2;
 
   // Contains the block data elements that changed compared to the previous block. A receiver of
@@ -351,8 +396,12 @@ message BroadcastBlockRequest {
     optional ProgramStorageTrieNode program_storage_changes = 3;
   }
 
-  // REQUIRED.
+  // The diff between th new block and the previous one. If both this field and `block_descriptor`
+  // are missing it means the node didn't produce any block during the slot.
   optional BlockDiff block_diff = 3;
+
+  // The TTL for the message.
+  optional uint32 ttl = 4 [default = 0];
 }
 
 message BroadcastBlockResponse {}
@@ -413,6 +462,9 @@ service NodeServiceV1 {
 
   // Returns the DOT balance of an account at a given block number (or at the latest block).
   rpc GetAccountBalance(GetAccountBalanceRequest) returns (GetAccountBalanceResponse);
+
+  // Request to broadcast a new transaction.
+  rpc BroadcastTransaction(BroadcastTransactionRequest) returns (BroadcastTransactionResponse);
 
   // Used by the leader(s) of a slot to publish a new block.
   rpc BroadcastNewBlock(BroadcastBlockRequest) returns (BroadcastBlockResponse);
