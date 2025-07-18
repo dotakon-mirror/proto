@@ -76,8 +76,12 @@ enum SignatureScheme {
 enum VerifiableRandomnessScheme {
   VRF_UNKNOWN = 0;
 
-  // VRF based on Decisional Diffie-Hellman over the Ristretto curve using the SHA-3 hash.
-  VRF_DDH_RISTRETTO_SHA3 = 1;
+  // VRF based on Decisional Diffie-Hellman over the Pallas curve using SHA3.
+  //
+  // NOTE: SHA3 is only used to hash the challenge scalar, while the hash-to-curve algorithm is
+  // specific to the Pallas curve and implemented by the `pasta_curves` crate (see
+  // https://docs.rs/pasta_curves/0.5.1/pasta_curves/arithmetic/trait.CurveExt.html#tymethod.hash_to_curve).
+  VRF_DDH_PALLAS_SHA3 = 1;
 }
 
 // 256-bit unsigned integer type used to transmit account addresses, SHA hashes, and similar data.
