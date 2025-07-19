@@ -151,9 +151,11 @@ message BlockDescriptor {
   optional Bytes32 block_hash = 1;
   optional fixed64 block_number = 2;
   optional Bytes32 previous_block_hash = 3;
-  optional Bytes32 network_topology_root_hash = 4;
-  optional Bytes32 account_balances_root_hash = 5;
-  optional Bytes32 program_storage_root_hash = 6;
+  optional google.protobuf.Timestamp timestamp = 4;
+  optional Bytes32 network_topology_root_hash = 5;
+  optional Bytes32 transactions_root_hash = 6;
+  optional Bytes32 account_balances_root_hash = 7;
+  optional Bytes32 program_storage_root_hash = 8;
 }
 
 // A Merkle proof for a piece of storage.
