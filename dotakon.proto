@@ -231,9 +231,9 @@ message MerkleProof {
   // encoded as a `Bytes32` message.
   optional google.protobuf.Any value = 3;
 
-  // The lookup path up to the root of the Merkle-Patricia Trie. There must be exactly 256 elements.
-  // The first node is the looked up leaf, while the last one is the root.
-  repeated Node node = 4;
+  // The lookup path up to the root of the Merkle tree. There must be exactly 256 elements. The
+  // first node is the looked up leaf, while the last one is the root.
+  repeated Node path = 4;
 }
 
 // Contains the geographical location of a node.
