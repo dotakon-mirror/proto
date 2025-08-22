@@ -219,8 +219,8 @@ message MerkleProof {
 
   // A node of the lookup path.
   message Node {
-    optional Bytes32 left_child_hash = 1;
-    optional Bytes32 right_child_hash = 2;
+    // There MUST be exactly 3 elements.
+    repeated Bytes32 child_hashes = 1;
   }
 
   // The full key of the queried storage location.
@@ -231,7 +231,7 @@ message MerkleProof {
   // encoded as a `Bytes32` message.
   optional google.protobuf.Any value = 3;
 
-  // The lookup path up to the root of the Merkle tree. There must be exactly 256 elements. The
+  // The lookup path up to the root of the Merkle tree. There must be exactly 161 elements. The
   // first node is the looked up leaf, while the last one is the root.
   repeated Node path = 4;
 }
