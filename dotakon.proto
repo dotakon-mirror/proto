@@ -200,7 +200,7 @@ message Transaction {
   optional Signature signature = 2;
 }
 
-// A signed transaction bound to a specific state (see `previous_state_hash` for details).
+// A signed transaction bound to a specific state (see `parent_transaction_hash` for details).
 message BoundTransaction {
   // The hash of the parent transaction, representing the blockchain state this transaction was
   // applied to.
