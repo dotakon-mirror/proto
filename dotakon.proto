@@ -173,7 +173,7 @@ message BlockDescriptor {
 // hashable version.
 message Transaction {
   // Payload content for DOT transfer transactions.
-  message TransferCoins {
+  message SendCoins {
     optional Bytes32 recipient = 1;
     optional Bytes32 amount = 2;
   }
@@ -187,7 +187,7 @@ message Transaction {
     optional uint64 nonce = 1;
 
     oneof transaction {
-      TransferCoins transfer_coins = 2;
+      SendCoins send_coins = 2;
       CreateProgram create_program = 3;
     }
   }
