@@ -62,8 +62,8 @@ enum SignatureScheme {
 
   // Schnorr signatures over the Pallas curve using the SHA-3-256 hash.
   //
-  // NOTE: Pallas scalars are defined over a prime field whose order is a large prime with roughly
-  // 252 bits, so the SHA-3 challenge hash of the signature must be wrapped modulo that prime (a
+  // NOTE: Pallas scalars are defined over a finite field whose order is a large prime with roughly
+  // 255 bits, so the SHA-3 challenge hash of the signature must be wrapped modulo that prime (a
   // little entropy will be lost).
   SIG_SCHNORR_PALLAS_SHA3_256 = 100;
 
