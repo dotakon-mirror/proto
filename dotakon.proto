@@ -153,14 +153,15 @@ message ProtocolVersion {
 // fields and uniquely identifies the block.
 message BlockDescriptor {
   optional Bytes32 block_hash = 1;
-  optional fixed64 block_number = 2;
-  optional Bytes32 previous_block_hash = 3;
-  optional google.protobuf.Timestamp timestamp = 4;
-  optional Bytes32 network_topology_root_hash = 5;
-  optional Bytes32 last_transaction_hash = 6;
-  optional Bytes32 account_balances_root_hash = 7;
-  optional Bytes32 staking_balances_root_hash = 8;
-  optional Bytes32 program_storage_root_hash = 9;
+  optional uint64 chain_id = 2;
+  optional fixed64 block_number = 3;
+  optional Bytes32 previous_block_hash = 4;
+  optional google.protobuf.Timestamp timestamp = 5;
+  optional Bytes32 network_topology_root_hash = 6;
+  optional Bytes32 last_transaction_hash = 7;
+  optional Bytes32 account_balances_root_hash = 8;
+  optional Bytes32 staking_balances_root_hash = 9;
+  optional Bytes32 program_storage_root_hash = 10;
 }
 
 // A signed transaction.
@@ -185,11 +186,12 @@ message Transaction {
   }
 
   message Payload {
-    optional uint64 nonce = 1;
+    optional uint64 chain_id = 1;
+    optional uint64 nonce = 2;
 
     oneof transaction {
-      SendCoins send_coins = 2;
-      CreateProgram create_program = 3;
+      SendCoins send_coins = 3;
+      CreateProgram create_program = 4;
     }
   }
 
@@ -254,15 +256,18 @@ message NodeIdentity {
     // containing this file.
     optional ProtocolVersion protocol_version = 1;
 
+    // The globally unique ID of the network this node participates in.
+    optional uint64 chain_id = 2;
+
     // Wallet address of the node. This is the address used to stake DOT and earn rewards for
     // participating in the network.
-    optional Bytes32 account_address = 2;
+    optional Bytes32 account_address = 3;
 
     // Self-declared geographical location of the node.
     //
     // NOTE: it's in the node's best interest to declare an accurate location, otherwise it won't be
     // able to achieve a competitive serving SLO.
-    optional GeographicalLocation location = 3;
+    optional GeographicalLocation location = 4;
 
     // The IP address other nodes can use to connect to this node. It can be an IPv4 address, an
     // IPv6 address, or a DNS name, but it must be in a canonical form that can be used to uniquely
@@ -271,16 +276,16 @@ message NodeIdentity {
     // dual-stack node cannot provide an IPv4 address and then switch to IPv6, or provide an IPv6
     // address in one format and then switch to a different format, etc. In order to change address,
     // a node must leave and re-join the network.
-    optional string network_address = 4;
+    optional string network_address = 5;
 
     // The TCP port where the node exposes this gRPC protocol.
-    optional uint32 grpc_port = 5;
+    optional uint32 grpc_port = 6;
 
     // The TCP port where the node exposes this protocol as gRPC-web.
-    optional uint32 http_port = 6;
+    optional uint32 http_port = 7;
 
     // The time of serialization of this message, used to avoid signature replay attacks.
-    optional google.protobuf.Timestamp timestamp = 7;
+    optional google.protobuf.Timestamp timestamp = 8;
   }
 
   // The encoded payload. The type URL must be `type.dotakon.org/dotakon.NodeIdentity.Payload`.
@@ -407,17 +412,20 @@ message BroadcastTransactionResponse {}
 message BroadcastBlockRequest {
   // Proof that the sender was actually a leader for the slot.
   message LeaderElectionProof {
-    // REQUIRED. The slot number.
-    optional uint64 slot_number = 1;
+    // REQUIRED. The network ID. This prevents the proof from being replayed across networks.
+    optional uint64 chain_id = 1;
+
+    // REQUIRED. The slot number. This prevents the proof from being replayed across blocks.
+    optional uint64 slot_number = 2;
 
     // REQUIRED. The previous block hash, which we use a per-slot randomness when seeding the VRF.
-    optional Bytes32 previous_block_hash = 2;
+    optional Bytes32 previous_block_hash = 3;
 
     // REQUIRED. The seed message MUST be in the format
-    // `{domain="dotakon/ssle-v1",slot_number=N,slot_randomness=SLOT_RANDOMNESS}`, where `N` is the
-    // base-10 slot number and `SLOT_RANDOMNESS` is the hash of the previous block encoded in
-    // lower-case hex starting with `0x`.
-    optional VerifiableRandomness randomness = 3;
+    // `{domain="dotakon/ssle-v1",chain_id=ID,slot_number=N,slot_randomness=SLOT_RANDOMNESS}`, where
+    // `ID` is the base-10 network ID, `N` is the base-10 slot number, and `SLOT_RANDOMNESS` is the
+    // hash of the previous block encoded in lower-case hex starting with `0x`.
+    optional VerifiableRandomness randomness = 4;
   }
 
   // REQUIRED.
@@ -457,7 +465,7 @@ message BroadcastBlockRequest {
     optional ProgramStorageTrieNode program_storage_changes = 3;
   }
 
-  // The diff between th new block and the previous one. If both this field and `block_descriptor`
+  // The diff between the new block and the previous one. If both this field and `block_descriptor`
   // are missing it means the node didn't produce any block during the slot.
   optional BlockDiff block_diff = 3;
 
