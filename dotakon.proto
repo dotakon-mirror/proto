@@ -163,6 +163,24 @@ message BlockDescriptor {
   optional Bytes32 program_storage_root_hash = 9;
 }
 
+// Describes the status of an account.
+//
+// This can be an externally owned account or a smartcontract alike
+message AccountInfo {
+  // The latest transaction nonce used by the account. Zero means the account has never submitted
+  // any transactions. Future transactions are rejected if their nonce is less than or equal to this
+  // value.
+  optional uint64 last_nonce = 1 [default = 0];
+
+  // REQUIRED. The DOT balance (in dan) associated to the account.
+  optional Bytes32 balance = 2;
+
+  // The staking balance (in dan) associated to the account. This field is filled in only for
+  // accounts associated to nodes of the network; it's left empty for regular, non-staking accounts
+  // or smartcontracts.
+  optional Bytes32 staking_balance = 3;
+}
+
 // A signed transaction.
 //
 // NOTE 1: the sender is the signer of the transaction, i.e. `signature.signer`.
@@ -347,25 +365,10 @@ message GetAccountRequest {
 
 // Returns the Merkle-proven information of an account at the specified block.
 message GetAccountResponse {
-  message Payload {
-    // The latest transaction nonce used by the account. Zero means the account has never submitted
-    // any transactions. Future transactions are rejected if their nonce is less than or equal to
-    // this value.
-    optional uint64 last_nonce = 1 [default = 0];
-
-    // REQUIRED. The DOT balance (in dan) associated to the account.
-    optional Bytes32 balance = 2;
-
-    // The staking balance (in dan) associated to the account. This field is filled in only for
-    // accounts associated to nodes of the network; it's left empty for regular, non-staking
-    // accounts or smartcontracts.
-    optional Bytes32 staking_balance = 3;
-  }
-
   // The encoded payload. The type URL must be `type.dotakon.org/dotakon.MerkleProof`.
   //
-  // The value inside the proof must be a `GetAccountResponse.Payload` message. The key must be the
-  // account address.
+  // The value inside the proof must be an `AccountInfo` message. The key must be the account
+  // address.
   optional google.protobuf.Any payload = 1;
 
   // REQUIRED. The message must be signed so that the server can be slashed if it returns incorrect
