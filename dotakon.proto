@@ -159,10 +159,8 @@ message BlockDescriptor {
   optional google.protobuf.Timestamp timestamp = 5;
   optional Bytes32 network_topology_root_hash = 6;
   optional Bytes32 last_transaction_hash = 7;
-  optional Bytes32 account_balances_root_hash = 8;
-  optional Bytes32 staking_balances_root_hash = 9;
-  optional Bytes32 program_storage_root_hash = 10;
-  optional Bytes32 account_nonces_root_hash = 11;
+  optional Bytes32 accounts_root_hash = 8;
+  optional Bytes32 program_storage_root_hash = 9;
 }
 
 // A signed transaction.
@@ -337,6 +335,43 @@ message NetworkTopology {
 // Requests the current network topology.
 message GetTopologyRequest {}
 
+// Requests the information of an account at the specified block. The specified account can be a
+// smartcontract or EOA alike.
+message GetAccountRequest {
+  // An optional block hash (defaults to the latest block if unspecified).
+  optional Bytes32 block_hash = 1;
+
+  // REQUIRED: the address to query.
+  optional Bytes32 account_address = 2;
+}
+
+// Returns the Merkle-proven information of an account at the specified block.
+message GetAccountResponse {
+  message Payload {
+    // The latest transaction nonce used by the account. It's left empty if the account has never
+    // submitted any transactions.
+    optional uint64 nonce = 1;
+
+    // REQUIRED. The DOT balance (in dan) associated to the account.
+    optional Bytes32 balance = 2;
+
+    // The staking balance (in dan) associated to the account. This field is filled in only for
+    // accounts associated to nodes of the network; it's left empty for regular, non-staking
+    // accounts or smartcontracts.
+    optional Bytes32 staking_balance = 3;
+  }
+
+  // The encoded payload. The type URL must be `type.dotakon.org/dotakon.MerkleProof`.
+  //
+  // The value inside the proof must be a `GetAccountResponse.Payload` message. The key must be the
+  // account address.
+  optional google.protobuf.Any payload = 1;
+
+  // REQUIRED. The message must be signed so that the server can be slashed if it returns incorrect
+  // data. Unsigned messages must not be accepted.
+  optional Signature signature = 2;
+}
+
 // Looks up a transaction by hash.
 message GetTransactionRequest {
   // REQUIRED. The hash of the transaction to look up.
@@ -347,52 +382,6 @@ message GetTransactionRequest {
 message GetTransactionResponse {
   // The encoded payload. The type URL must be
   // `type.dotakon.org/dotakon.BoundTransaction`.
-  optional google.protobuf.Any payload = 1;
-
-  // REQUIRED. The message must be signed so that the server can be slashed if it returns incorrect
-  // data. Unsigned messages must not be accepted.
-  optional Signature signature = 2;
-}
-
-// Requests the DOT balance of an account at the specified block. The specified account can be a
-// smartcontract or EOA alike.
-message GetAccountBalanceRequest {
-  // An optional block hash (defaults to the latest block if unspecified).
-  optional Bytes32 block_hash = 1;
-
-  // REQUIRED: the address to query.
-  optional Bytes32 account_address = 2;
-}
-
-// Returns the Merkle-proven DOT balance of an account at the specified block.
-message GetAccountBalanceResponse {
-  // The encoded payload. The type URL must be `type.dotakon.org/dotakon.MerkleProof`.
-  //
-  // The value inside the proof must be a `Bytes32` message providing the DOT balance in dan. The
-  // key must be the account address.
-  optional google.protobuf.Any payload = 1;
-
-  // REQUIRED. The message must be signed so that the server can be slashed if it returns incorrect
-  // data. Unsigned messages must not be accepted.
-  optional Signature signature = 2;
-}
-
-// Requests the DOT staking balance of an account at the specified block. The specified account must
-// be that of a node of the network.
-message GetStakingBalanceRequest {
-  // An optional block hash (defaults to the latest block if unspecified).
-  optional Bytes32 block_hash = 1;
-
-  // REQUIRED: the address to query.
-  optional Bytes32 account_address = 2;
-}
-
-// Returns the Merkle-proven DOT staking balance of an account at the specified block.
-message GetStakingBalanceResponse {
-  // The encoded payload. The type URL must be `type.dotakon.org/dotakon.MerkleProof`.
-  //
-  // The value inside the proof must be a `Bytes32` message providing the DOT balance in dan. The
-  // key must be the account address.
   optional google.protobuf.Any payload = 1;
 
   // REQUIRED. The message must be signed so that the server can be slashed if it returns incorrect
@@ -530,15 +519,11 @@ service NodeServiceV1 {
   // Returns the current topology of the network.
   rpc GetTopology(GetTopologyRequest) returns (NetworkTopology);
 
+  // Returns all the information of an account at a given block number (or at the latest block).
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
+
   // Looks up a transaction by hash.
   rpc GetTransaction(GetTransactionRequest) returns (GetTransactionResponse);
-
-  // Returns the DOT balance of an account at a given block number (or at the latest block).
-  rpc GetAccountBalance(GetAccountBalanceRequest) returns (GetAccountBalanceResponse);
-
-  // Returns the DOT staking balance of an account at a given block number (or at the latest block).
-  // The account address must be that of a node.
-  rpc GetStakingBalance(GetStakingBalanceRequest) returns (GetStakingBalanceResponse);
 
   // Request to broadcast a new transaction.
   rpc BroadcastTransaction(BroadcastTransactionRequest) returns (BroadcastTransactionResponse);
