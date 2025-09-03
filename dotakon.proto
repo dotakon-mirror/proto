@@ -162,7 +162,7 @@ message BlockDescriptor {
   optional Bytes32 account_balances_root_hash = 8;
   optional Bytes32 staking_balances_root_hash = 9;
   optional Bytes32 program_storage_root_hash = 10;
-  optional Bytes32 transaction_nonces_root_hash = 11;
+  optional Bytes32 account_nonces_root_hash = 11;
 }
 
 // A signed transaction.
